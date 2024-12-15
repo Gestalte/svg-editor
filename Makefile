@@ -1,13 +1,2 @@
-CC = gcc
-NAME = editor
-SHELL = CMD
-DEPS = nanosvg.h nanosvgrast.h raylib.h raygui.h
-
-all: compile run
-
-compile: $(NAME).c $(DEPS)
-	$(CC) -o $(NAME).exe $(NAME).c $(DEPS)
-
-run:
-	$(NAME).exe
-
+program: editor.c libs/raylib/raylib.h
+	gcc -o editor.exe editor.c libs/raylib/raylib.h libs/raylib/libraylib.a -Wall -lgdi32 -lwinmm -mwindows

@@ -1,41 +1,18 @@
-#define NANOSVG_IMPLEMENTATION // Expands implementation
-#include "nanosvg.h"
+#include "libs/raylib/raylib.h"
 
-#define NANOSVGRAST_IMPLEMENTATION
-#include "nanosvgrast.h"
+int main(void)
+{
+    InitWindow(800, 450, "raylib [core] example - basic window");
 
-#include "raylib.h"
-
-#define RAYGUI_IMPLEMENTATION
-#include "raygui.h"
-
-int main() {
-  InitWindow(400, 200, "raygui - controls test suite");
-  SetTargetFPS(60);
-
-  bool showMessageBox = false;
-
-  while (!WindowShouldClose()) {
-    // Draw
-    //----------------------------------------------------------------------------------
-    BeginDrawing();
-    ClearBackground(GetColor(GuiGetStyle(DEFAULT, BACKGROUND_COLOR)));
-
-    if (GuiButton((Rectangle){24, 24, 120, 30}, "#191#Show Message"))
-      showMessageBox = true;
-
-    if (showMessageBox) {
-      int result =
-          GuiMessageBox((Rectangle){85, 70, 250, 100}, "#191#Message Box",
-                        "Hi! This is a message!", "Nice;Cool");
-
-      if (result >= 0)
-        showMessageBox = false;
+    while (!WindowShouldClose())
+    {
+        BeginDrawing();
+            ClearBackground(RAYWHITE);
+            DrawText("Congrats! You created your first window!", 190, 200, 20, LIGHTGRAY);
+        EndDrawing();
     }
 
-    EndDrawing();
-  }
+    CloseWindow();
 
-  CloseWindow();
-  return 0;
+    return 0;
 }
