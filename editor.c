@@ -2,33 +2,143 @@
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
 
-int main(void)
-{
-   InitWindow(400, 200, "raygui - controls test suite");
-    SetTargetFPS(60);
+#define NANOSVG_IMPLEMENTATION // Expands implementation
+#include "nanosvg.h"
 
-    bool showMessageBox = false;
+#define NANOSVGRAST_IMPLEMENTATION
+#include "nanosvgrast.h"
 
-    while (!WindowShouldClose())
-    {
-        // Draw
-        //----------------------------------------------------------------------------------
-        BeginDrawing();
-            ClearBackground(GetColor(GuiGetStyle(DEFAULT, BACKGROUND_COLOR)));
+static Image LoadImageSVG(const char *fileName, int width, int height);
 
-            if (GuiButton((Rectangle){ 24, 24, 120, 30 }, "#191#Show Message")) showMessageBox = true;
+int main(void) {
+  // Initialization
+  //--------------------------------------------------------------------------------------
+  const int screenWidth = 800;
+  const int screenHeight = 450;
 
-            if (showMessageBox)
-            {
-                int result = GuiMessageBox((Rectangle){ 85, 70, 250, 100 },
-                    "#191#Message Box", "Hi! This is a message!", "Nice;Cool");
+  InitWindow(screenWidth, screenHeight, "svg loading");
 
-                if (result >= 0) showMessageBox = false;
-            }
+  // NOTE: Textures MUST be loaded after Window initialization (OpenGL context
+  // is required)
 
-        EndDrawing();
+  // Loaded in CPU memory (RAM)
+  Image image = LoadImageSVG("blocks.svg", 400, 349);
+  // Image converted to texture, GPU memory (VRAM)
+  Texture2D texture = LoadTextureFromImage(image);
+  UnloadImage(image); // Once image has been converted to texture and uploaded
+                      // to VRAM, it can be unloaded from RAM
+
+  SetTargetFPS(60); // Set our game to run at 60 frames-per-second
+  //---------------------------------------------------------------------------------------
+
+  // Main game loop
+  while (!WindowShouldClose()) // Detect window close button or ESC key
+  {
+    // Update
+    //----------------------------------------------------------------------------------
+    // TODO: Update your variables here
+    //----------------------------------------------------------------------------------
+
+    // Draw
+    //----------------------------------------------------------------------------------
+    BeginDrawing();
+
+    ClearBackground(RAYWHITE);
+
+    DrawTexture(texture, screenWidth / 2 - texture.width / 2,
+                screenHeight / 2 - texture.height / 2, WHITE);
+
+    // Red border to illustrate how the SVG is centered within the specified
+    // dimensions
+    DrawRectangleLines((screenWidth / 2 - texture.width / 2) - 1,
+                       (screenHeight / 2 - texture.height / 2) - 1,
+                       texture.width + 2, texture.height + 2, RED);
+
+    DrawText("this IS a texture loaded from an SVG file!", 300, 410, 10, GRAY);
+
+    EndDrawing();
+    //----------------------------------------------------------------------------------
+  }
+
+  // De-Initialization
+  //--------------------------------------------------------------------------------------
+  UnloadTexture(texture); // Texture unloading
+
+  CloseWindow(); // Close window and OpenGL context
+  //--------------------------------------------------------------------------------------
+
+  return 0;
+}
+
+// Load SVG image, rasteraizing it at desired width and height
+// NOTE: If width/height are 0, using internal default width/height
+static Image LoadImageSVG(const char *fileName, int width, int height) {
+  Image image = {0};
+
+  if ((strcmp(GetFileExtension(fileName), ".svg") == 0) ||
+      (strcmp(GetFileExtension(fileName), ".SVG") == 0)) {
+    int dataSize = 0;
+    unsigned char *fileData = NULL;
+
+    fileData = LoadFileData(fileName, &dataSize);
+
+    // Make sure the file data contains an EOL character: '\0'
+    if ((dataSize > 0) && (fileData[dataSize - 1] != '\0')) {
+      fileData = RL_REALLOC(fileData, dataSize + 1);
+      fileData[dataSize] = '\0';
+      dataSize += 1;
     }
 
-    CloseWindow();
-    return 0;
+    // Validate fileData as valid SVG string data
+    //<svg xmlns="http://www.w3.org/2000/svg" width="2500" height="2484"
+    // viewBox="0 0 192.756 191.488">
+    if ((fileData != NULL) && (fileData[0] == '<') && (fileData[1] == 's') &&
+        (fileData[2] == 'v') && (fileData[3] == 'g')) {
+      struct NSVGimage *svgImage = nsvgParse((char *)fileData, "px", 96.0f);
+
+      unsigned char *imgData =
+          RL_MALLOC(svgImage->width * svgImage->height * 4);
+
+      // NOTE: If required width or height is 0, using default SVG internal
+      // value
+      if (width == 0)
+        width = svgImage->width;
+      if (height == 0)
+        height = svgImage->height;
+
+      // Calculate scales for both the width and the height
+      float scaleWidth = width / svgImage->width;
+      float scaleHeight = height / svgImage->height;
+
+      // Set the largest of the 2 scales to be the scale to use
+      float scale = (scaleHeight > scaleWidth) ? scaleWidth : scaleHeight;
+
+      int offsetX = 0;
+      int offsetY = 0;
+
+      if (scaleHeight > scaleWidth)
+        offsetY = (height - svgImage->height * scale) / 2;
+      else
+        offsetX = (width - svgImage->width * scale) / 2;
+
+      // Rasterize
+      struct NSVGrasterizer *rast = nsvgCreateRasterizer();
+      nsvgRasterize(rast, svgImage, offsetX, offsetY, scale, imgData, width,
+                    height, width * 4);
+
+      // Populate image struct with all data
+      image.data = imgData;
+      image.width = width;
+      image.height = height;
+      image.mipmaps = 1;
+      image.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
+
+      nsvgDelete(svgImage);
+      nsvgDeleteRasterizer(rast);
+    }
+
+    UnloadFileData(fileData);
+  }
+
+  return image;
 }
